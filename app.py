@@ -73,6 +73,18 @@ tn, fp, fn, tp = [int(v) for v in confusion_matrix(y_test, pred).ravel()]
 cost_without = (tp + fn) * breakdown
 cost_with = tp * planned + fn * breakdown + fp * false_alarm
 saving = cost_without - cost_with
+# Best threshold for maximum savings
+best_t, best_saving = None, None
+for t in [x / 100 for x in range(10, 91, 5)]:
+    p_t = (probs >= t).astype(int)
+    a, b, c, d = [int(v) for v in confusion_matrix(y_test, p_t).ravel()]  # tn, fp, fn, tp
+    s = (c + d) * breakdown - (d * planned + c * breakdown + b * false_alarm)
+    if best_saving is None or s > best_saving:
+        best_t, best_saving = t, s
+
+# Scale to a bigger fleet
+fleet_size = st.sidebar.number_input("Fleet size (machines)", value=10000, step=1000)
+fleet_saving = int(saving / len(X_test) * fleet_size)
 
 
 def status(p):
@@ -106,6 +118,8 @@ with tab1:
     c2.metric("Failures caught", f"{tp} of {tp + fn}")
     c3.metric("False alarms", fp)
     c4.metric("Cost reduction", f"{round(saving / cost_without * 100) if cost_without else 0}%")
+    st.success(f"Best alert threshold for this model: {best_t:.2f}, saving Rs {best_saving:,}")
+    st.info(f"Estimated savings across a fleet of {fleet_size:,} machines: Rs {fleet_saving:,}")
 
     st.subheader("Highest-risk machines")
     top = risk.sort_values("failure_probability", ascending=False).head(20)
